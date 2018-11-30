@@ -9,7 +9,9 @@ exports._ajax = function () {
   if (typeof module !== "undefined" && module.require && !(typeof process !== "undefined" && process.versions["electron"])) {
     // We are on node.js
     platformSpecific.newXHR = function () {
-      var XHR = module.require("xhr2");
+      // Modified by Joop Ringelberg to accomodate cookies.
+      // var XHR = module.require("xhr2");
+      var XHR = module.require("xhr2-cookies").XMLHttpRequest;
       return new XHR();
     };
 
@@ -87,4 +89,3 @@ exports._ajax = function () {
     };
   };
 }();
-

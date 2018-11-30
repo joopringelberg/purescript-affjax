@@ -19,6 +19,12 @@ If you are intending to use the library in a Node.js setting rather than the bro
 npm install xhr2
 ```
 
+*Note*: the tagged version v.5.1.0 uses xhr2-cookies instead. Install with:
+
+```
+npm install xhr2-cookies
+```
+
 ## Introduction
 
 You can construct requests with the `affjax` function:
