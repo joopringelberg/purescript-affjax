@@ -27,42 +27,56 @@ npm install xhr2-cookies
 
 ## Introduction
 
-You can construct requests with the `affjax` function:
+You can construct requests with the `request` function:
 
 ```purescript
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
-import Control.Monad.Eff.Class (liftEff)
-import Control.Monad.Aff (launchAff)
+
+import Affjax as AX
+import Affjax.ResponseFormat as ResponseFormat
+import Data.Argonaut.Core as J
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Network.HTTP.Affjax (affjax, defaultRequest)
+import Effect.Aff (launchAff)
+import Effect.Class.Console (log)
 
 main = launchAff $ do
-  res <- affjax $ defaultRequest { url = "/api", method = Left GET }
-  liftEff $ log $ "GET /api response: " <> res.response
+  res <- AX.request (AX.defaultRequest { url = "/api", method = Left GET, responseFormat = ResponseFormat.json })
+  case res.body of
+    Left err -> log $ "GET /api response failed to decode: " <> AX.printResponseFormatError err
+    Right json -> log $ "GET /api response: " <> J.stringify json
 ```
 
 (`defaultRequest` is a record value that has all the required fields pre-set for convenient overriding when making a request.)
 
-Or use of a number of helpers for common cases:
+There are also a number of helpers for common `get`, `post`, `put`, `delete`, and `patch` cases:
 
 ```purescript
-import Network.HTTP.Affjax (get, post)
+import Affjax.RequestBody as RequestBody
 
 main = launchAff $ do
-  res1 <- get "/api"
-  liftEff $ log $ "GET /api response: " <> res1.response
+  res1 <- AX.get ResponseFormat.json "/api"
+  case res1.body of
+    Left err -> log $ "GET /api response failed to decode: " <> AX.printResponseFormatError err
+    Right json -> log $ "GET /api response: " <> J.stringify json
 
-  res2 <- post "/api" someData
-  liftEff $ log $ "POST /api response: " <> res2.response
+  res2 <- AX.post ResponseFormat.json "/api" (RequestBody.json (J.fromString "test"))
+  case res2.body of
+    Left err -> log $ "POST /api response failed to decode: " <> AX.printResponseFormatError err
+    Right json -> log $ "POST /api response: " <> J.stringify json
 ```
 
-See the module documentation for a full list of these helpers.
+See the [main module documentation](https://pursuit.purescript.org/packages/purescript-affjax/docs/Affjax) for a full list of these helpers and their variations.
 
-When sending data in a request the Requestable class enables automatic conversion into a format that is acceptable for an XHR request. Correspondingly there is a Respondable class for reading data that comes back from the server.
+## Error handling
+
+There are two ways an Affjax request can fail: there's either some problem with the request itself, or the result that comes back is not as expected.
+
+For the first case, these errors will be things like the URL being invalid or the server not existing, and will occur in the `Aff` error channel. The [`try`](https://pursuit.purescript.org/packages/purescript-aff/docs/Effect.Aff#v:try) function can lift these errors out of the error channel so the result of a request becomes `Aff (Either Error (Response _))`.
+
+The latter case occurs when we did get a response for the request, but the result that came back could not be handled in the way that was expected. In these situations the `body` value of the `Response` will be a `Left` value with the error message describing what went wrong.
 
 ## Module documentation
 

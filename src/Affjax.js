@@ -55,12 +55,17 @@ exports._ajax = function () {
           errback(e);
         }
       }
-      xhr.onerror = function () {
-        errback(new Error("AJAX request failed: " + options.method + " " + options.url));
+      var onerror = function (msg) {
+        return function () {
+          errback(new Error(msg + ": " + options.method + " " + options.url));
+        };
       };
+      xhr.onerror = onerror("AJAX request failed");
+      xhr.ontimeout = onerror("AJAX request timed out");
       xhr.onload = function () {
         callback({
           status: xhr.status,
+          statusText: xhr.statusText,
           headers: xhr.getAllResponseHeaders().split("\r\n")
             .filter(function (header) {
               return header.length > 0;
@@ -69,22 +74,20 @@ exports._ajax = function () {
               var i = header.indexOf(":");
               return mkHeader(header.substring(0, i))(header.substring(i + 2));
             }),
-          response: platformSpecific.getResponse(xhr)
+          body: platformSpecific.getResponse(xhr)
         });
       };
       xhr.responseType = options.responseType;
       xhr.withCredentials = options.withCredentials;
       xhr.send(options.content);
 
-      return function (/* error */) {
-        return function (cancelErrback, cancelCallback) {
-          try {
-            xhr.abort();
-          } catch (e) {
-            return cancelErrback(e);
-          }
-          return cancelCallback();
-        };
+      return function (error, cancelErrback, cancelCallback) {
+        try {
+          xhr.abort();
+        } catch (e) {
+          return cancelErrback(e);
+        }
+        return cancelCallback();
       };
     };
   };
