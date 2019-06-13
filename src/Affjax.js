@@ -6,7 +6,8 @@
 
 exports._ajax = function () {
   var platformSpecific = { };
-  if (typeof module !== "undefined" && module.require && !(typeof process !== "undefined" && process.versions["electron"])) {
+  // Modified by Joop Ringelberg to accomodate a bundle created by webpack.
+  if (typeof module !== "undefined" && (module.require || __webpack_require__) && !(typeof process !== "undefined" && process.versions["electron"])) {
     // We are on node.js
     platformSpecific.newXHR = function () {
       // Modified by Joop Ringelberg to accomodate cookies.
