@@ -1,51 +1,22 @@
-/* global exports */
-/* global XMLHttpRequest */
-/* global module */
-/* global process */
 "use strict";
 
-exports._ajax = function () {
-  var platformSpecific = { };
-  // Modified by Joop Ringelberg to accomodate a bundle created by webpack.
-  if (typeof module !== "undefined" && (module.require || __webpack_require__) && !(typeof process !== "undefined" && process.versions["electron"])) {
-    // We are on node.js
-    platformSpecific.newXHR = function () {
-      // Modified by Joop Ringelberg to accomodate cookies.
-      // var XHR = module.require("xhr2");
-      var XHR = module.require("xhr2-cookies").XMLHttpRequest;
-      return new XHR();
-    };
-
-    platformSpecific.fixupUrl = function (url) {
-      var urllib = module.require("url");
-      var u = urllib.parse(url);
-      u.protocol = u.protocol || "http:";
-      u.hostname = u.hostname || "localhost";
-      return urllib.format(u);
-    };
-
-    platformSpecific.getResponse = function (xhr) {
-      return xhr.response;
-    };
-  } else {
-    // We are in the browser
-    platformSpecific.newXHR = function () {
-      return new XMLHttpRequest();
-    };
-
-    platformSpecific.fixupUrl = function (url) {
-      return url || "/";
-    };
-
-    platformSpecific.getResponse = function (xhr) {
-      return xhr.response;
-    };
-  }
-
+function node_ajax()
+{
   return function (mkHeader, options) {
     return function (errback, callback) {
-      var xhr = platformSpecific.newXHR();
-      var fixedUrl = platformSpecific.fixupUrl(options.url);
+
+      function fixupUrl (url) {
+        var urllib = module.require("url");
+        var u = urllib.parse(url);
+        u.protocol = u.protocol || "http:";
+        u.hostname = u.hostname || "localhost";
+        return urllib.format(u);
+      }
+
+      var XHR = module.require("xhr2-cookies").XMLHttpRequest;
+      var xhr = new XHR();
+
+      var fixedUrl = fixupUrl(options.url);
       xhr.open(options.method || "GET", fixedUrl, true, options.username, options.password);
       if (options.headers) {
         try {
@@ -75,7 +46,7 @@ exports._ajax = function () {
               var i = header.indexOf(":");
               return mkHeader(header.substring(0, i))(header.substring(i + 2));
             }),
-          body: platformSpecific.getResponse(xhr)
+          body: xhr.response
         });
       };
       xhr.responseType = options.responseType;
@@ -92,4 +63,89 @@ exports._ajax = function () {
       };
     };
   };
-}();
+}
+
+function browser_ajax()
+{
+  return function (mkHeader, options)
+  {
+    return function (errback, callback)
+    {
+      const controller = new AbortController();
+      const { signal } = controller;
+
+      const onerror = function (msg) {
+        return function () {
+          errback(new Error(msg + ": " + options.method + " " + options.url));
+        };
+      };
+
+      function mapHeaders (headers)
+      {
+        const result = [];
+        for (var pair of headers.entries())
+        {
+          result.push( mkHeader( pair[0], pair[1]));
+        }
+        return result;
+      }
+      let headers = new Headers();
+      if (options.headers) {
+        try {
+          for (var i = 0, header; (header = options.headers[i]) != null; i++)
+          {
+            headers.append( header.field, header.value );
+          }
+        } catch (e) {
+          errback(e);
+        }
+      }
+      if (options.username && options.password)
+      {
+        headers.set('Authorization', 'Basic ' + btoa( `${options.username}:${options.password}` ));
+      }
+      // ignore responsetype. fetch has no interface for it.
+      fetch(options.url || "/",
+        { method: options.method || "GET"
+          // Map the boolean given for withCredentials as follows:
+          // false -> same-origin
+          // true -> include
+        , credentials: options.credentials ? "include" : "same-origin"
+        , headers: headers
+        , body: options.content
+        , signal
+        , mode: "cors"
+        })
+        .then( function( response )
+          {
+            callback(
+              { status: response.status
+              , statusText: response.statusText
+              , headers: mapHeaders( response.headers )
+              , body: response.body
+            });
+          })
+        // no specific handler for timeout, or abort.
+        .catch( onerror );
+
+        return function (error, cancelErrback, cancelCallback) {
+          try {
+            controller.abort();
+          } catch (e) {
+            return cancelErrback(e);
+          }
+          return cancelCallback();
+        };
+    };
+  };
+}
+
+if (inBrowser())
+{
+  exports._ajax = browser_ajax;
+}
+else {
+  exports._ajax = node_ajax();
+}
+
+const inBrowser=new Function("{ try { return this===window; } catch(e) { try { return this===self; } catch(e) { return false; } } }");

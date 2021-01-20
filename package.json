@@ -6,7 +6,7 @@
     "test": "eslint src && pulp test"
   },
   "devDependencies": {
-    "eslint": "^3.10.1",
+    "eslint": "^7.13.0",
     "body-parser": "^1.15.2",
     "express": "^4.14.0",
     "pulp": "^11.0.0",
