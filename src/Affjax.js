@@ -79,12 +79,6 @@ function browser_ajax() {
       var controller = new AbortController();
       var signal = controller.signal;
 
-      var onerror = function onerror(msg) {
-        return function () {
-          errback(new Error(msg + ": " + options.method + " " + options.url));
-        };
-      };
-
       function mapHeaders(headers) {
         var result = [];
 
@@ -94,7 +88,10 @@ function browser_ajax() {
         try {
           for (_iterator.s(); !(_step = _iterator.n()).done;) {
             var pair = _step.value;
-            result.push(mkHeader(pair[0], pair[1]));
+
+            if (pair[0] && pair[1]) {
+              result.push(mkHeader(pair[0])(pair[1]));
+            }
           }
         } catch (err) {
           _iterator.e(err);
@@ -110,7 +107,9 @@ function browser_ajax() {
       if (options.headers) {
         try {
           for (var i = 0, header; (header = options.headers[i]) != null; i++) {
-            headers.append(header.field, header.value);
+            if (header.field && header.value) {
+              headers.append(header.field, header.value);
+            }
           }
         } catch (e) {
           errback(e);
@@ -142,8 +141,10 @@ function browser_ajax() {
             body: t
           });
         });
-      }) // no specific handler for timeout, or abort.
-      ["catch"](onerror);
+      })["catch"](function (msg) {
+        errback(new Error(msg + ": " + options.method + " " + options.url));
+      }); // no specific handler for timeout, or abort.
+
       return function (error, cancelErrback, cancelCallback) {
         try {
           controller.abort();
